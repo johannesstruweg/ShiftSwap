@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShiftSwap</title>
+    
+    <!-- Fonts: Inter for that clean Scandi look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Phosphor Icons (Minimalist Icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        scandi: {
+                            bg: '#F8F9FA',
+                            card: '#FFFFFF',
+                            text: '#111827',
+                            muted: '#6B7280',
+                            accent: '#0F172A',
+                            success: '#10B981',
+                            border: '#E5E7EB'
+                        }
+                    },
+                    boxShadow: {
+                        'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        'float': '0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 4px 6px -2px rgba(0, 0, 0, 0.01)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F8F9FA; color: #111827; }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- Components ---
+
+        const Header = () => (
+            <header className="flex justify-between items-center py-8 px-6 max-w-md mx-auto">
+                <div className="flex items-center gap-2">
+                    <i className="ph-bold ph-arrows-left-right text-xl"></i>
+                    <h1 className="text-lg font-semibold tracking-tight text-scandi-text">ShiftSwap</h1>
+                </div>
+                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                    AL
+                </div>
+            </header>
+        );
+
+        const ShiftCard = ({ date, time, role, onSwap }) => (
+            <div className="bg-scandi-card rounded-2xl p-6 shadow-subtle border border-scandi-border mb-4 transition-all hover:shadow-float">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="bg-gray-50 px-3 py-1 rounded-full text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Upcoming
+                    </div>
+                    <i className="ph ph-dots-three text-gray-400 text-xl"></i>
+                </div>
+                
+                <h2 className="text-2xl font-medium mb-1">{date}</h2>
+                <p className="text-scandi-muted mb-6 font-light">{time}</p>
+                
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <i className="ph-fill ph-briefcase text-gray-400"></i>
+                        {role}
+                    </div>
+                    <button 
+                        onClick={onSwap}
+                        className="bg-scandi-accent text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors shadow-lg shadow-gray-200"
+                    >
+                        Request Swap
+                    </button>
+                </div>
+            </div>
+        );
+
+        const AIResultCard = ({ topMatch, reasoning, onClose }) => (
+            <div className="fade-in bg-white rounded-2xl p-6 shadow-float border border-emerald-100 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                
+                <div className="flex items-center gap-2 mb-3 text-emerald-600">
+                    <i className="ph-fill ph-sparkle"></i>
+                    <span className="text-xs font-bold uppercase tracking-widest">AI Assist Analysis</span>
+                </div>
+
+                <h3 className="text-xl font-medium text-gray-900 mb-1">
+                    Request sent to <span className="text-emerald-700">{topMatch}</span>
+                </h3>
+                
+                <div className="mt-4 p-4 bg-emerald-50 rounded-xl">
+                    <p className="text-emerald-900 text-sm leading-relaxed">
+                        "{reasoning}"
+                    </p>
+                </div>
+
+                <button 
+                    onClick={onClose}
+                    className="mt-6 w-full py-3 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                    Close
+                </button>
+            </div>
+        );
+
+        const Modal = ({ isOpen, onClose, onSubmit, isLoading }) => {
+            if (!isOpen) return null;
+            const [message, setMessage] = useState("");
+
+            return (
+                <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4 fade-in">
+                    <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-medium">Swap Request</h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                                <i className="ph ph-x text-xl"></i>
+                            </button>
+                        </div>
+                        
+                        <div className="mb-6">
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                                Optional Message
+                            </label>
+                            <textarea 
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all resize-none"
+                                rows="3"
+                                placeholder="Reason for swap..."
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                            ></textarea>
+                        </div>
+
+                        <button 
+                            onClick={() => onSubmit(message)}
+                            disabled={isLoading}
+                            className="w-full bg-scandi-accent text-white py-3 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <i className="ph ph-spinner animate-spin text-lg"></i>
+                                    Analyzing Schedule...
+                                </>
+                            ) : (
+                                "Find Best Match"
+                            )}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App ---
+
+        const App = () => {
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [result, setResult] = useState(null);
+
+            // Hardcoded for MVP Demo matching the Seed Data
+            const currentShift = {
+                id: 1, // Matches seed.py
+                date: "Tomorrow",
+                time: "09:00 AM - 05:00 PM",
+                role: "Waiter"
+            };
+
+            const handleSwapRequest = async (msg) => {
+                setIsLoading(true);
+                
+                try {
+                    // Hitting the local API
+                    const response = await fetch('http://localhost:8000/api/v1/swaps/request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            requesting_user_id: 1, // Alice
+                            shift_id: currentShift.id,
+                            optional_message: msg
+                        }),
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data) {
+                        setResult(data);
+                        setIsModalOpen(false);
+                    }
+                } catch (error) {
+                    console.error("API Error:", error);
+                    alert("Ensure backend is running on port 8000!");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen font-sans text-scandi-text pb-20">
+                    <Header />
+
+                    <main className="max-w-md mx-auto px-6 mt-4">
+                        <div className="mb-8">
+                            <h1 className="text-3xl font-medium mb-2 text-gray-900">Hello, Alice.</h1>
+                            <p className="text-scandi-muted">Here is your schedule for the week.</p>
+                        </div>
+
+                        {!result ? (
+                            <ShiftCard 
+                                {...currentShift} 
+                                onSwap={() => setIsModalOpen(true)}
+                            />
+                        ) : (
+                            <AIResultCard 
+                                topMatch={result.top_match_name}
+                                reasoning={result.ai_reasoning}
+                                onClose={() => setResult(null)}
+                            />
+                        )}
+
+                        {/* Placeholder for empty state/future shifts */}
+                        <div className="mt-8 pt-8 border-t border-gray-100 text-center">
+                            <p className="text-sm text-gray-400 font-light">No other shifts scheduled.</p>
+                        </div>
+                    </main>
+
+                    <Modal 
+                        isOpen={isModalOpen} 
+                        onClose={() => setIsModalOpen(false)}
+                        onSubmit={handleSwapRequest}
+                        isLoading={isLoading}
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
