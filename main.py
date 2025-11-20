@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -12,6 +13,16 @@ from ai_service import get_ai_rankings
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="ShiftSwap AI Backend")
+
+# --- CORS SETTINGS (NEW) ---
+# Allows the frontend to talk to this backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def read_root():
@@ -33,14 +44,12 @@ def request_swap(request: SwapRequestCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Shift not found")
     
     # 2. Eligibility Engine (Simple: Same Role, not the requestor)
-    # In a real app, we would also check if they are already working during this time slot.
     candidates = db.query(User).filter(
         User.role == shift.role,
         User.id != request.requesting_user_id
     ).all()
     
     if not candidates:
-        # Hard stop if no one can take it
         return SwapRequestResponse(
             message="No eligible colleagues found.",
             status="FAILED"
@@ -53,7 +62,6 @@ def request_swap(request: SwapRequestCreate, db: Session = Depends(get_db)):
         "end": str(shift.end_time)
     }
     
-    # Format candidate data for the prompt
     candidate_list = [
         {"id": c.id, "name": c.name, "hours_last_7d": c.hours_worked_last_7d}
         for c in candidates
@@ -64,7 +72,6 @@ def request_swap(request: SwapRequestCreate, db: Session = Depends(get_db)):
     # 4. AI Ranking
     ai_result = get_ai_rankings(shift_data, candidate_list)
     
-    # Extract the best match
     top_match = None
     ai_reason = "AI Service unavailable"
     
@@ -85,7 +92,7 @@ def request_swap(request: SwapRequestCreate, db: Session = Depends(get_db)):
 
     # 6. Response
     return SwapRequestResponse(
-        message="Swap requested successfully. Notifications sent.",
+        message="Swap requested successfully.",
         status="PENDING",
         top_match_name=top_match.name if top_match else "None",
         ai_reasoning=ai_reason
